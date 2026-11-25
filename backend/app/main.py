@@ -83,6 +83,7 @@ def create_session(payload: CreateSessionRequest) -> SessionState:
 
     session = storage.create_session(
         case_packet=case_packet,
+        reading_grace_seconds=payload.reading_grace_seconds,
         silence_nudge_seconds=payload.silence_nudge_seconds,
         tts_enabled=payload.tts_enabled,
         demo_mode=settings.demo_mode,

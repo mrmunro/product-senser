@@ -61,6 +61,13 @@ export function InterviewRoom({
 
   const totalDurationSeconds = session.duration_minutes * 60;
   const remainingSeconds = Math.max(0, totalDurationSeconds - elapsedSeconds);
+  const readingGraceSeconds = session.reading_grace_seconds ?? 120;
+  const hasSpokenOnce = useMemo(
+    () => session.turns.some((t) => t.role === 'candidate'),
+    [session.turns],
+  );
+  const isInReadingGrace = !hasSpokenOnce && elapsedSeconds < readingGraceSeconds;
+  const readingRemainingSeconds = Math.max(0, readingGraceSeconds - elapsedSeconds);
   const currentPhase = useMemo(
     () => getPhaseForElapsed(session.phases, elapsedSeconds),
     [session.phases, elapsedSeconds],
@@ -158,17 +165,18 @@ export function InterviewRoom({
         return next;
       });
 
-      if (!ptt.isRecording && !submitting && session.silence_nudge_seconds > 0) {
+      if (!isInReadingGrace && !ptt.isRecording && !submitting && session.silence_nudge_seconds > 0) {
         setSilenceSeconds((prev) => prev + 1);
       }
     }, 1000);
 
     return () => window.clearInterval(id);
-  }, [ending, handleEndSession, ptt.isRecording, session.silence_nudge_seconds, session.status, submitting, totalDurationSeconds]);
+  }, [ending, handleEndSession, isInReadingGrace, ptt.isRecording, session.silence_nudge_seconds, session.status, submitting, totalDurationSeconds]);
 
   // Trigger Thinking-Out-Loud silence nudge when threshold reached
   useEffect(() => {
     if (
+      isInReadingGrace ||
       session.silence_nudge_seconds <= 0 ||
       ptt.isRecording ||
       submitting ||
@@ -200,6 +208,7 @@ export function InterviewRoom({
   }, [
     elapsedSeconds,
     ending,
+    isInReadingGrace,
     ptt.isRecording,
     session.session_id,
     session.silence_nudge_seconds,
@@ -329,12 +338,22 @@ export function InterviewRoom({
               <p>{currentPhase.objective}</p>
             </div>
             {session.silence_nudge_seconds > 0 && (
-              <div className="silence-meter" title="Silence nudge countdown">
-                <span>Silence</span>
-                <strong>
-                  {silenceSeconds}s / {session.silence_nudge_seconds}s
-                </strong>
-              </div>
+              isInReadingGrace ? (
+                <div
+                  className="silence-meter reading-grace"
+                  title="2-minute reading grace period before the silence nudge starts — start speaking whenever you're ready"
+                >
+                  <span>Reading Time</span>
+                  <strong>{formatClock(readingRemainingSeconds)} left</strong>
+                </div>
+              ) : (
+                <div className="silence-meter" title="Silence nudge countdown">
+                  <span>Silence</span>
+                  <strong>
+                    {silenceSeconds}s / {session.silence_nudge_seconds}s
+                  </strong>
+                </div>
+              )
             )}
           </div>
 

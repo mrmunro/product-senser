@@ -59,6 +59,7 @@ export interface SessionState {
   ended_at: string | null;
   status: 'active' | 'completed';
   duration_minutes: number;
+  reading_grace_seconds: number;
   silence_nudge_seconds: number;
   tts_enabled: boolean;
   demo_mode: boolean;

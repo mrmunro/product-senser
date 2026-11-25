@@ -83,6 +83,7 @@ class Storage:
     def create_session(
         self,
         case_packet: CasePacket,
+        reading_grace_seconds: int = 120,
         silence_nudge_seconds: int = 60,
         tts_enabled: bool = True,
         demo_mode: bool = False,
@@ -113,6 +114,7 @@ class Storage:
             started_at=now,
             status="active",
             duration_minutes=case_packet.duration_minutes,
+            reading_grace_seconds=reading_grace_seconds,
             silence_nudge_seconds=silence_nudge_seconds,
             tts_enabled=tts_enabled,
             demo_mode=demo_mode,

@@ -124,9 +124,9 @@ export function Lobby({
                     value={silenceNudgeSeconds}
                     onChange={(e) => setSilenceNudgeSeconds(Number(e.target.value))}
                   >
-                    <option value={45}>45 seconds</option>
-                    <option value={60}>60 seconds (Recommended)</option>
-                    <option value={90}>90 seconds</option>
+                    <option value={45}>45 seconds (after 2m reading time)</option>
+                    <option value={60}>60 seconds (Recommended, after 2m reading time)</option>
+                    <option value={90}>90 seconds (after 2m reading time)</option>
                     <option value={0}>Off</option>
                   </select>
                 </div>
@@ -158,6 +158,42 @@ export function Lobby({
               </div>
             </div>
           )}
+
+          <div className="panel-box how-it-works">
+            <h3>How the 45-Minute Exercise Works</h3>
+            <div className="how-grid">
+              <div className="how-item">
+                <strong>2-Minute Reading Grace Period</strong>
+                <p>
+                  When the session starts, you get <strong>2 minutes</strong> to read the business context and
+                  challenge before the silence nudge timer activates. Start speaking early whenever you're ready.
+                </p>
+              </div>
+              <div className="how-item">
+                <strong>Hidden Facts & Stakeholder Curveballs</strong>
+                <p>
+                  The panel holds realistic constraints (team capacity, API state, commercial pipeline, compliance)
+                  and only reveals them when asked. Expect 1–2 curveballs in Phase 4.
+                </p>
+              </div>
+              <div className="how-item">
+                <strong>Voice-Only Push-to-Talk Discipline</strong>
+                <p>
+                  Hold <code>Spacebar</code> or click to speak (no typing). Your turn timer turns{' '}
+                  <strong className="amber-text">amber at 2:30</strong> and{' '}
+                  <strong className="red-text">red at 3:30</strong> to train crisp, signposted answers.
+                </p>
+              </div>
+              <div className="how-item">
+                <strong>6-Phase Pacing & Scored Debrief</strong>
+                <p>
+                  <code>0–6m</code> Clarify · <code>6–13m</code> Strategy · <code>13–28m</code> Deep Dive &amp;
+                  Architecture · <code>28–38m</code> Curveballs · <code>38–43m</code> 2-min Executive Wrap-Up ·{' '}
+                  <code>43–45m</code> Debrief.
+                </p>
+              </div>
+            </div>
+          </div>
         </section>
 
         <aside className="lobby-sidebar">

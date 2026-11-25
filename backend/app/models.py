@@ -90,6 +90,7 @@ class SessionState(BaseModel):
     ended_at: Optional[datetime] = None
     status: Literal["active", "completed"] = "active"
     duration_minutes: int = 45
+    reading_grace_seconds: int = 120
     silence_nudge_seconds: int = 60
     tts_enabled: bool = True
     demo_mode: bool = False
@@ -120,6 +121,7 @@ class SessionSummary(BaseModel):
 
 class CreateSessionRequest(BaseModel):
     case_id: str
+    reading_grace_seconds: int = Field(default=120, ge=0, le=600)
     silence_nudge_seconds: int = Field(default=60, ge=0, le=300)
     tts_enabled: bool = True
 

@@ -71,6 +71,7 @@ def test_end_to_end_session_lifecycle(tmp_path: Path, monkeypatch):
     session = created.json()
     session_id = session["session_id"]
     assert session["status"] == "active"
+    assert session["reading_grace_seconds"] == 120
     assert len(session["turns"]) == 1
     assert session["turns"][0]["role"] == "interviewer"
 
