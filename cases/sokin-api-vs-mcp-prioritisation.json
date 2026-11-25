@@ -1,0 +1,42 @@
+{
+  "id": "sokin-api-vs-mcp-prioritisation",
+  "title": "API Foundation vs. MCP Agentic Treasury Prioritisation",
+  "company": "Sokin",
+  "role": "Senior PM — External Developer Experience",
+  "duration_minutes": 45,
+  "difficulty": "Senior / Staff PM",
+  "tags": ["API-as-a-Product", "MCP & AI Agents", "Prioritisation", "Trust-by-Design", "Embedded Finance"],
+  "interviewers": [
+    {
+      "name": "Alex",
+      "role": "Group PM (Get Set Up & Build)",
+      "focus": "Strategy, prioritisation, DX metrics, commercial trade-offs, white-label partner growth"
+    },
+    {
+      "name": "Sam",
+      "role": "Principal Platform Engineer",
+      "focus": "Sandbox parity, API gateway enforcement, MCP security/entitlements, idempotency, post-M&A API unification"
+    }
+  ],
+  "candidate_brief_markdown": "# Case Study Brief: API Foundation vs. MCP Agentic Treasury Prioritisation\n\n**Company:** Sokin (London HQ — B2B Cross-Border Payments, FX, Treasury & Embedded Financial Infrastructure)  \n**Role:** Senior Product Manager — External Developer Experience (reporting to Group PM, Get Set Up & Build)  \n**Timebox:** 45 Minutes\n\n---\n\n## 1. Company & Strategic Context\n\nSokin operates across **170+ countries** and **70+ currencies**, backed by **regulatory licenses in 36 countries**. Following a **$50M Series B** ($300M valuation, Dec 2025) and a **$100M growth debt facility** from Oxford Finance (Jan 2026), Sokin is profitable and scaling rapidly from **$90M H1 2026 run-rate net revenue toward a $120M run-rate target by December 2026**.\n\nIn 2026, Sokin accelerated its platform footprint:\n- **Acquisitions:** Acquired **Settle Group AS** (European EMI licensing/tech) and **Genpaid** (blockchain-native stablecoin settlement stack).\n- **Hybrid Finance (Mar 2026):** Unified fiat and stablecoin wallets/settlement under one regulated platform.\n- **MCP Connector for AI Treasury (Sep 2026):** Connected Sokin's regulated rails to ChatGPT, Claude, Gemini, and Perplexity so finance teams can query balances, pull live FX quotes, add beneficiaries, and stage cross-border payments.\n- **Embedded Finance & White-Label APIs:** Onboarding/KYB API, Corporate Currency Accounts (vIBANs), Payments & Payouts API, FX/Treasury with configurable partner markups, and Acceptance.\n\nCEO Vroon Modgill's public thesis is **\"The Layer Underneath\"**: AI agents and front-end UX are commoditising; Sokin's defensible moat is its **regulated global rails and licenses** that both software platforms and autonomous agents must plug into to move money.\n\n---\n\n## 2. The Problem on Your Desk\n\nIt is Week 2 in your new role as Senior PM for External Developer Experience. You inherit a broad remit spanning **API governance, docs (`docs.sokin.com`), sandbox, SDKs, MCP/agent entitlements, and white-label partner productisation**.\n\nTwo competing pressures have collided ahead of Q1/Q2 planning:\n\n1. **Foundational API & Embedded DX Debt:**  \n   Rapid growth and two 2026 acquisitions have left an inconsistent external API surface. Sandbox uses static mocks that drift from production, API error responses are opaque, and embedded/white-label partners frequently stall during onboarding and KYB handoffs. Support and Client Implementation teams are absorbing heavy manual escalations.\n\n2. **MCP & Agentic Treasury Momentum:**  \n   Following the September 2026 MCP Connector launch, leadership and Sales see massive differentiation in \"Agentic Finance.\" Several enterprise prospects and an embedded ERP partner want to move beyond read-only queries to **AI agents staging and executing live FX conversions and supplier payouts**—but enterprise CISOs and Sokin's Compliance team are raising red flags about permissions, spend limits, looping retries, and auditability.\n\n---\n\n## 3. Your Task\n\nYou are meeting with **Alex (Group PM)** and **Sam (Principal Platform Engineer)** to present your product strategy and 2-quarter roadmap recommendation.\n\nBe prepared to:\n1. **Clarify the situation** before jumping to solutions (ask targeted questions about constraints, capacity, and commercial reality).\n2. **Frame the strategy:** What is the core objective over the next 2 quarters? Who are you optimising for, and what are you explicitly **not** solving right now?\n3. **Prioritise & Architect:** How do you sequence **Foundational API/Sandbox DX** vs. **Enterprise MCP Agentic Entitlements**? Distinguish clearly between **Core Platform Layer** investments and **Application/DX Layer** investments, with **Trust-by-Design** baked in.\n4. **Handle trade-offs & stakeholder pushback** when engineering capacity, compliance requirements, and commercial deadlines collide.\n5. **Deliver a crisp 2-minute Executive Wrap-Up** suitable for the CPO/CEO with concrete sequencing and success metrics.\n",
+  "hidden_facts": {
+    "engineering_capacity": "You have 1 dedicated DX/Platform squad of 5 engineers (3 backend, 1 full-stack/portal, 1 QA/devrel) for the next 2 quarters. No dedicated technical writer yet (hiring approved for Q2). Identity/RBAC changes require coordination with the Core Platform Services team (2-week lead time).",
+    "current_api_state": "Sandbox uses static mocks that drift from production on FX quotes, webhooks, and KYB states. Roughly 40% of Tier-2 developer support tickets are opaque 400/500 errors or undocumented field validation rules. Median Time to First Sandbox Payment (TTFP) is currently 6–9 business days.",
+    "post_ma_surface": "Genpaid's stablecoin rails currently expose slightly different payload conventions and error schemas than Sokin's core fiat Payments API; Settle Group's EU EMI onboarding fields add conditional KYB requirements that aren't clearly surfaced in sandbox.",
+    "mcp_current_state": "The Sept 2026 MCP Connector currently authenticates using standard user-level OAuth tokens without distinct agent identities, granular per-tool spend limits, or a dedicated agent audit trail. It supports read-only queries and basic payment staging, with no gateway-enforced velocity caps yet.",
+    "commercial_pressure": "2 mid-market/enterprise prospects (~$350k combined ARR) are asking for MCP treasury demos with bounded autonomous sweeps. Meanwhile, 1 Tier-1 white-label embedded partner (~$500k ARR) has been stalled in integration for 5 weeks due to sandbox drift and opaque KYB RFI delays.",
+    "compliance_stance": "Compliance and Security are supportive of MCP in principle, but will strictly block any GA autonomous execution unless there are gateway-enforced spend caps, beneficiary whitelists, idempotency protection against agent retry loops, and immutable admin-attributed audit logs.",
+    "white_label_sla_gap": "Direct Sokin clients onboard in ~3 business days on average, whereas white-label partners' end-customers average 9–12 days because KYB RFI requests happen over email instead of structured webhooks/APIs."
+  },
+  "curveballs": [
+    "Compliance and Security just intervened: they will block any GA autonomous MCP payment execution unless immutable admin-attributed audit logs, per-transaction caps, and emergency kill-switches are enforced at the API Gateway layer before launch. Sam says that gateway/RBAC work plus sandbox parity cannot both finish in Q1—one has to slip to Q2.",
+    "The CEO wants a flagship 'Agentic Treasury' headline demo at Money20/20 in 8 weeks to reinforce the $120M run-rate narrative, while Support and Client Implementation say they are drowning in integration tickets from the stalled £500k white-label partner. What do you cut, what do you ship in 8 weeks, and how do you defend that call to the CEO?"
+  ],
+  "evaluation_focus": [
+    "Thinking out loud before committing to a recommendation",
+    "Asking high-leverage clarifying questions before jumping into solutions",
+    "Explicit trade-off framing (API foundation vs. MCP hype) tied to Sokin's $90M→$120M revenue & embedded growth",
+    "Clear architectural distinction between Core Platform Layer (gateway-enforced entitlements, idempotency, audit ledger) and Application/DX Layer (schemas, docs, sandbox simulator)",
+    "Trust-by-Design baked into agentic access (Read → Stage → Bounded Execute, never trusting LLM prompts for limits)"
+  ]
+}

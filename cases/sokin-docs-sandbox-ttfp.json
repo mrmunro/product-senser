@@ -1,0 +1,41 @@
+{
+  "id": "sokin-docs-sandbox-ttfp",
+  "title": "Redesigning docs.sokin.com & Sandbox for <1-Day First Payment",
+  "company": "Sokin",
+  "role": "Senior PM — External Developer Experience",
+  "duration_minutes": 45,
+  "difficulty": "Senior PM",
+  "tags": ["Developer Experience", "Sandbox Parity", "JTBD Docs", "API Governance", "White-Label KYB"],
+  "interviewers": [
+    {
+      "name": "Alex",
+      "role": "Group PM (Get Set Up & Build)",
+      "focus": "Developer funnel metrics (TTFP, conversion), JTBD documentation, support ticket deflection, partner onboarding SLAs"
+    },
+    {
+      "name": "Sam",
+      "role": "Principal Platform Engineer",
+      "focus": "Contract-first OpenAPI CI/CD, deterministic sandbox simulation for async webhooks & compliance holds, RFC 7807 error taxonomy"
+    }
+  ],
+  "candidate_brief_markdown": "# Case Study Brief: Redesigning `docs.sokin.com` & Sandbox for <1-Day First Payment\n\n**Company:** Sokin (B2B Global Payments, FX, Treasury & Embedded Financial Infrastructure)  \n**Role:** Senior Product Manager — External Developer Experience  \n**Timebox:** 45 Minutes\n\n---\n\n## 1. Strategic Context\n\nSokin's embedded finance and direct API channels are primary growth engines as the company scales from **$90M toward $120M run-rate net revenue** across **170+ countries** and **36 licensed jurisdictions**. Sokin competes head-to-head with **Airwallex** and **Currencycloud (Visa)** for software platforms and global mid-market corporates embedding multi-currency accounts (vIBANs), FX, and cross-border payouts.\n\nIn developer-led evaluations, technical buyers form a verdict within their first 24 hours. Today, Sokin's developer portal (`docs.sokin.com`) is organised as an **endpoint-centric Swagger reference dump** that grew organically alongside rapid product expansion and two 2026 acquisitions (Settle Group AS for EU EMI rails and Genpaid for stablecoin settlement).\n\n---\n\n## 2. Observed Symptoms\n\n- **Slow Activation:** External developers take an average of **7+ business days** to complete their first end-to-end simulated payment in sandbox.\n- **High Support Load:** Client Implementation and Tier-2 Support spend significant time walking partners through authentication, webhook signature verification, opaque `400`/`500` error payloads, and asynchronous payment/KYB state transitions.\n- **Sandbox-to-Production Surprises:** Partners who pass sandbox testing still hit unexpected validation failures, FX quote expiry edge cases, and compliance/RFI holds when cutting over to production.\n- **White-Label SLA Parity Gap:** Reseller and embedded partners struggle to give their end-customers the same onboarding speed as Sokin's direct clients because KYB states and missing document requests aren't cleanly testable or exposed in the developer journey.\n\n---\n\n## 3. Your Task\n\nAlex (Group PM) has challenged you to design a **6-month transformation plan** to get median **Time to First Sandbox Payment (TTFP) under 1 business day** while cutting integration-related support tickets by at least **30%**.\n\nBe prepared to:\n1. **Diagnose & Clarify:** Uncover the real bottlenecks across docs, sandbox architecture, error design, and internal squad governance.\n2. **Reframe around Jobs to Be Done (JTBD):** Structure the developer experience around core jobs (*Get Set Up → Send → Collect → Track*) and define what \"zero-drift\" sandbox parity actually requires in a multi-rail payments platform.\n3. **Design Governance Without Bureaucracy:** Propose how to enforce API consistency and error standards across multiple internal squads (including recently acquired teams) without becoming a bottleneck.\n4. **Navigate Trade-Offs:** Defend your sequencing when Sales pushes for new rail features or bespoke partner workarounds.\n5. **Close with an Executive Plan:** Sequencing, measurable KPIs, and top risks.\n",
+  "hidden_facts": {
+    "current_ttfp_breakdown": "Of the ~7 business days to first sandbox payment: 2 days are waiting for manual sandbox credential provisioning, 2 days are auth/token & webhook signature debugging, and 3 days are trial-and-error with undocumented payload validation and mocked responses that don't match docs.",
+    "support_ticket_drivers": "Top 4 integration tickets: (1) Generic '400 Bad Request - Validation Failed' without field pointers (32%), (2) Webhook delivery & HMAC verification confusion (24%), (3) KYB/beneficiary compliance hold states not reproducible in sandbox (22%), (4) Currency corridor / cutoff / FX quote expiry mismatches (14%).",
+    "team_constraints": "1 DX squad (5 engineers) + shared access to 2 Client Implementation engineers. No dedicated tech writer in Q1 (contractor budget available for 8 weeks). 4 core product squads ship API changes weekly without automated OpenAPI linting.",
+    "sandbox_architecture": "Current sandbox is a standalone mock service maintained manually by QA; it is ~4 months behind production on payment validation rules and has zero simulation for async webhooks, failed SWIFT wires, or AML/KYB RFI holds.",
+    "white_label_context": "Embedded partners must disclose Sokin's regulated status (FCA/EU EMI) and collect KYB documents. Partners currently have no webhook or sandbox trigger to test 'RFI_REQUIRED' or 'MANUAL_REVIEW' states, causing nasty surprises after go-live.",
+    "commercial_metric": "Every week saved in partner integration cycle time pulls forward ~$25k–$40k in monthly TPV net revenue across the active embedded pipeline of 18 partners."
+  },
+  "curveballs": [
+    "Sam pushes back hard: 'Rebuilding the sandbox to share production validation logic and deterministic state triggers across fiat and Genpaid stablecoin rails will take 2 full quarters. Meanwhile, 4 internal squads keep merging breaking schema changes every Friday. Why shouldn't we just freeze docs and spend 6 months rewriting the sandbox backend first?'",
+    "VP of Sales jumps in: 'A $600k logistics marketplace wants to sign this month if we build them a custom webhook schema and a dedicated implementation engineer. They don't care about self-serve docs. Should we pull 2 DX engineers off the portal/error taxonomy for 6 weeks to close the deal?'"
+  ],
+  "evaluation_focus": [
+    "Diagnosing root causes (provisioning wait, opaque errors, mock drift) before prescribing UI redesigns",
+    "Connecting Jobs to Be Done (Get Set Up, Send, Collect, Track) to measurable funnel metrics (TTFP, Sandbox-to-Prod conversion, ticket deflection)",
+    "Technical depth on sandbox parity (shared production validation, deterministic magic-value triggers for async webhooks & KYB/AML holds)",
+    "Pragmatic API governance (automated CI/CD OpenAPI linting like Spectral + RFC 7807 error taxonomy rather than heavy committees)",
+    "Quantifying DX investments in commercial terms (faster time-to-TPV, lower Implementation/Support cost)"
+  ]
+}
