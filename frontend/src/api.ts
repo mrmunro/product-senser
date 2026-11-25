@@ -1,5 +1,6 @@
 import type {
   CaseSummary,
+  GenerateCaseResponse,
   HealthResponse,
   SessionState,
   SessionSummary,
@@ -29,6 +30,21 @@ export const api = {
 
   listCases(): Promise<CaseSummary[]> {
     return fetch('/api/cases').then((r) => handleJson<CaseSummary[]>(r));
+  },
+
+  generateCase(params: {
+    source_markdown: string;
+    urls: string[];
+    topic?: string;
+    company?: string;
+    role?: string;
+    duration_minutes?: number;
+  }): Promise<GenerateCaseResponse> {
+    return fetch('/api/cases/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    }).then((r) => handleJson<GenerateCaseResponse>(r));
   },
 
   listSessions(): Promise<SessionSummary[]> {

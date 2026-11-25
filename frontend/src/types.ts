@@ -124,3 +124,9 @@ export interface HealthResponse {
   elevenlabs_available: boolean;
   elevenlabs_voice_id: string | null;
 }
+
+export interface GenerateCaseResponse {
+  case: CaseSummary;
+  warnings: string[];
+  used_demo_mode: boolean;
+}

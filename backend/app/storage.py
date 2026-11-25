@@ -58,6 +58,12 @@ class Storage:
                 return packet
         return None
 
+    def save_case(self, packet: CasePacket) -> Path:
+        self.cases_dir.mkdir(parents=True, exist_ok=True)
+        target = self.cases_dir / f"{packet.id}.json"
+        target.write_text(packet.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        return target
+
     def get_candidate_case_view(self, case_id: str) -> Optional[CandidateCaseView]:
         packet = self.get_case(case_id)
         if not packet:

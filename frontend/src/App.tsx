@@ -135,6 +135,12 @@ export function App() {
         void handleStartSession(caseId, nudge, tts, provider, wbEnabled)
       }
       onOpenSession={(id) => void handleOpenSession(id)}
+      onCaseGenerated={(newCase) => {
+        setCases((prev) => {
+          const filtered = prev.filter((c) => c.id !== newCase.id);
+          return [newCase, ...filtered];
+        });
+      }}
     />
   );
 }

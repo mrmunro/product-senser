@@ -11,12 +11,15 @@ from fastapi.responses import FileResponse, Response
 
 from app.agents.evaluator import generate_debrief
 from app.agents.interviewer import build_opening_turn, run_interviewer_turn
+from app.case_generator import generate_case_packet
 from app.config import settings
 from app.models import (
     CandidateCaseView,
     CaseSummary,
     CreateSessionRequest,
     EndSessionRequest,
+    GenerateCaseRequest,
+    GenerateCaseResponse,
     NudgeRequest,
     PhaseId,
     SessionState,
@@ -89,6 +92,46 @@ def get_case(case_id: str) -> CandidateCaseView:
     if not view:
         raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
     return view
+
+
+@app.post("/api/cases/generate", response_model=GenerateCaseResponse)
+async def generate_case(payload: GenerateCaseRequest) -> GenerateCaseResponse:
+    if not payload.source_markdown.strip() and not any(u.strip() for u in payload.urls):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide role-prep/JD markdown text or at least one public documentation URL.",
+        )
+    try:
+        result = await generate_case_packet(
+            source_markdown=payload.source_markdown,
+            urls=payload.urls,
+            topic=payload.topic,
+            company=payload.company,
+            role=payload.role,
+            duration_minutes=payload.duration_minutes,
+            case_id=payload.case_id,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Case generation failed: {exc}") from exc
+
+    packet = result.case_packet
+    storage.save_case(packet)
+    summary = CaseSummary(
+        id=packet.id,
+        title=packet.title,
+        company=packet.company,
+        role=packet.role,
+        duration_minutes=packet.duration_minutes,
+        difficulty=packet.difficulty,
+        tags=packet.tags,
+        interviewers=packet.interviewers,
+        evaluation_focus=packet.evaluation_focus,
+    )
+    return GenerateCaseResponse(
+        case=summary,
+        warnings=result.warnings,
+        used_demo_mode=result.used_demo_mode,
+    )
 
 
 @app.get("/api/sessions", response_model=list[SessionSummary])
