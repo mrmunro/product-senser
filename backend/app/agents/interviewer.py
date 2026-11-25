@@ -65,6 +65,8 @@ def _build_interviewer_prompt(
     speaking_duration_seconds: float,
     curveball_to_inject: Optional[int],
     transcript_override: Optional[str] = None,
+    has_whiteboard_png: bool = False,
+    whiteboard_diff: Optional[dict[str, object]] = None,
 ) -> str:
     personas_text = "\n".join(
         f"- {p.name} ({p.role}): Focuses on {p.focus}" for p in case_packet.interviewers
@@ -92,6 +94,23 @@ def _build_interviewer_prompt(
         else "Listen carefully to the attached audio clip of the candidate's spoken turn. Transcribe it faithfully (including meaningful pauses or filler words if notable) and note any delivery observations (pace, clarity, hesitation, signposting)."
     )
 
+    whiteboard_section = ""
+    if has_whiteboard_png or whiteboard_diff:
+        diff_json = json.dumps(whiteboard_diff, indent=2) if whiteboard_diff else "(no diff metadata)"
+        whiteboard_section = f"""
+LIVE EXCALIDRAW WHITEBOARD STATE (attached PNG + diff since last turn):
+{diff_json}
+WHITEBOARD COACHING RULES:
+- Actively inspect the attached whiteboard PNG alongside what the candidate just said.
+- Reference specific boxes, labels, layers, or arrows they drew when probing or challenging them (e.g., "I see you placed MCP Entitlements in the Application layer — push back on that for me...").
+- If we are in Phase 3 (Deep Dive & Architecture) and the canvas is still empty or sparse, gently prompt them to sketch the Core vs. Application boundary or trade-off matrix on the whiteboard.
+"""
+    elif session.whiteboard_enabled:
+        whiteboard_section = """
+LIVE EXCALIDRAW WHITEBOARD STATE:
+The whiteboard is currently blank (0 elements drawn so far). In Phase 3 (Deep Dive), encourage the candidate to anchor their architecture or prioritisation trade-offs visually if helpful.
+"""
+
     return f"""You are roleplaying an active, realistic senior PM interview panel for {case_packet.company} ({case_packet.role}).
 
 PANEL PERSONAS (pick the single most relevant speaker for this turn):
@@ -112,7 +131,7 @@ TIMING & PHASE STATE MACHINE:
 - Phase Objective: {phase.objective}
 - Required Interviewer Behaviour: {phase.interviewer_behavior}
 - Candidate's last turn speaking duration: {speaking_duration_seconds:.1f} seconds
-{curveball_instruction}
+{curveball_instruction}{whiteboard_section}
 
 CONVERSATION HISTORY:
 {_format_history(session)}
@@ -124,9 +143,10 @@ INSTRUCTIONS FOR YOUR REPLY:
 1. Stay strictly in character as one of the panel interviewers.
 2. Keep your spoken reply crisp, natural, and conversational — **2 to 4 sentences (~15–30 seconds when read aloud)**. Never lecture or give away the answer.
 3. Push back on hand-waving, unexamined assumptions, or missing constraints (e.g. compliance, engineering capacity, gateway enforcement, sandbox parity, commercial trade-offs).
-4. If the candidate jumped straight into solutions in Phase 1 without clarifying, gently nudge them to check constraints first.
-5. If we are in Phase 5 (Executive Wrap-Up), ask for or react to a crisp 2-minute CPO/CEO pitch.
-6. If we are in Phase 6 (Hard Stop), close the interview warmly and concisely.
+4. If the candidate drew on the whiteboard, ground your critique in what you actually see on the diagram.
+5. If the candidate jumped straight into solutions in Phase 1 without clarifying, gently nudge them to check constraints first.
+6. If we are in Phase 5 (Executive Wrap-Up), ask for or react to a crisp 2-minute CPO/CEO pitch.
+7. If we are in Phase 6 (Hard Stop), close the interview warmly and concisely.
 
 Return ONLY valid JSON matching this exact schema:
 {{
@@ -145,6 +165,7 @@ def _demo_interviewer_turn(
     curveball_to_inject: Optional[int],
     transcript_override: Optional[str] = None,
     speaking_duration_seconds: float = 0.0,
+    whiteboard_diff: Optional[dict[str, object]] = None,
 ) -> InterviewerTurnResult:
     """Deterministic local fallback when GEMINI_API_KEY is not set."""
     candidate_text = (
@@ -172,6 +193,27 @@ def _demo_interviewer_turn(
             reply=f"Hold on — let me throw a real constraint at you. {cb} How does that change your sequencing?",
             curveball_index=curveball_to_inject,
         )
+
+    # Acknowledge whiteboard updates in Demo Mode when new labels/elements were drawn
+    if whiteboard_diff and isinstance(whiteboard_diff, dict):
+        added = int(whiteboard_diff.get("added_count") or 0)
+        labels = whiteboard_diff.get("new_labels") or []
+        if added > 0 and phase.id in (PhaseId.FRAMING_STRATEGY, PhaseId.DEEP_DIVE):
+            label_snippet = (
+                f" including {', '.join(str(x) for x in labels[:3])}"
+                if isinstance(labels, list) and labels
+                else ""
+            )
+            return InterviewerTurnResult(
+                candidate_transcript=candidate_text,
+                delivery_notes="Captured whiteboard snapshot alongside spoken turn (Demo Mode).",
+                speaker_name=eng.name,
+                speaker_role=eng.role,
+                reply=(
+                    f"I see you added {added} element{'s' if added != 1 else ''} to the whiteboard{label_snippet}. "
+                    "Push back on that boundary for me: where exactly are spend limits, idempotency, and audit logs enforced so a looping agent can't bypass them?"
+                ),
+            )
 
     # Check if candidate asked about a hidden fact
     if any(w in lowered for w in ["team", "engineer", "capacity", "headcount", "squad", "writer"]):
@@ -268,8 +310,10 @@ def run_interviewer_turn(
     audio_bytes: Optional[bytes] = None,
     audio_mime_type: str = "audio/webm",
     transcript_override: Optional[str] = None,
+    whiteboard_png_bytes: Optional[bytes] = None,
+    whiteboard_diff: Optional[dict[str, object]] = None,
 ) -> InterviewerTurnResult:
-    """Process one Push-to-Talk candidate turn and return transcript + interviewer response."""
+    """Process one Push-to-Talk candidate turn (+ optional whiteboard snapshot) and return response."""
     if settings.demo_mode:
         return _demo_interviewer_turn(
             case_packet=case_packet,
@@ -278,6 +322,7 @@ def run_interviewer_turn(
             curveball_to_inject=curveball_to_inject,
             transcript_override=transcript_override,
             speaking_duration_seconds=speaking_duration_seconds,
+            whiteboard_diff=whiteboard_diff,
         )
 
     from google import genai
@@ -292,11 +337,15 @@ def run_interviewer_turn(
         speaking_duration_seconds=speaking_duration_seconds,
         curveball_to_inject=curveball_to_inject,
         transcript_override=transcript_override,
+        has_whiteboard_png=bool(whiteboard_png_bytes),
+        whiteboard_diff=whiteboard_diff,
     )
 
     contents: list[object] = [prompt]
     if audio_bytes and not transcript_override:
         contents.append(types.Part.from_bytes(data=audio_bytes, mime_type=audio_mime_type))
+    if whiteboard_png_bytes:
+        contents.append(types.Part.from_bytes(data=whiteboard_png_bytes, mime_type="image/png"))
 
     try:
         response = client.models.generate_content(

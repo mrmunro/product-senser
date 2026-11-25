@@ -26,6 +26,8 @@ def _compute_session_metrics(session: SessionState) -> dict[str, object]:
         "long_turns_over_2m30": long_turns,
         "elapsed_minutes": round(session.elapsed_seconds / 60.0, 1),
         "curveballs_handled": len(session.curveballs_injected),
+        "whiteboard_enabled": session.whiteboard_enabled,
+        "whiteboard_snapshot_count": len(session.whiteboard_snapshots),
         "phases_covered": phases_covered,
     }
 
@@ -37,7 +39,8 @@ def _format_full_transcript(session: SessionState) -> str:
         secs = t.elapsed_seconds % 60
         dur = f" | spoke {t.speaking_duration_seconds:.0f}s" if t.speaking_duration_seconds else ""
         notes = f" | delivery: {t.delivery_notes}" if t.delivery_notes else ""
-        lines.append(f"[{mins:02d}:{secs:02d} | {t.phase.value}{dur}] {t.speaker_name} ({t.role}): {t.text}{notes}")
+        wb = f" | whiteboard: {t.whiteboard_snapshot} ({t.whiteboard_diff_summary or 'captured'})" if t.whiteboard_snapshot else ""
+        lines.append(f"[{mins:02d}:{secs:02d} | {t.phase.value}{dur}{wb}] {t.speaker_name} ({t.role}): {t.text}{notes}")
     return "\n".join(lines) or "(No turns recorded.)"
 
 
@@ -103,6 +106,7 @@ def _demo_debrief(case_packet: CasePacket, session: SessionState) -> str:
 | Turns Over 2:30 (Amber/Red) | {metrics['long_turns_over_2m30']} |
 | Silence Nudges Triggered | {metrics['nudge_count']} |
 | Curveballs Handled | {metrics['curveballs_handled']} / {len(case_packet.curveballs)} |
+| Whiteboard Snapshots Captured | {metrics['whiteboard_snapshot_count']} ({'Enabled' if metrics['whiteboard_enabled'] else 'Audio-Only Mode'}) |
 
 ---
 
@@ -114,7 +118,7 @@ def _demo_debrief(case_packet: CasePacket, session: SessionState) -> str:
 | **Thinking Out Loud** | {4 if metrics['nudge_count'] == 0 else 3} / 5 | {metrics['nudge_count']} silence nudges triggered. Keep narrating hypotheses even while weighing trade-offs. |
 | **Clarity & Conciseness** | {4 if metrics['long_turns_over_2m30'] == 0 else 3} / 5 | Average spoken turn was {metrics['avg_turn_seconds']}s ({metrics['long_turns_over_2m30']} turns exceeded 2:30). Aim for 60–120s crisp turns. |
 | **Product Sense & Trade-Off Rigor** | 3 / 5 | Connect DX fixes directly to Sokin's $90M→$120M run-rate, Core vs. App layer boundaries, and gateway-enforced Trust-by-Design. |
-| **Visual / Whiteboard Readiness (Phase 2)** | N/A | Audio-only Phase 1 session. Practice verbalising architectural boundaries clearly in preparation for Excalidraw in Phase 2. |
+| **Whiteboard Effectiveness** | {('4 / 5' if metrics['whiteboard_snapshot_count'] > 0 else '2 / 5') if metrics['whiteboard_enabled'] else 'N/A'} | {f"{metrics['whiteboard_snapshot_count']} Excalidraw snapshot(s) captured. Anchor Core Platform vs. Application Layer boundaries visually as you narrate." if metrics['whiteboard_enabled'] else "Audio-Only Mode selected for this session."} |
 
 ---
 
@@ -135,8 +139,12 @@ def _demo_debrief(case_packet: CasePacket, session: SessionState) -> str:
 """
 
 
-def generate_debrief(case_packet: CasePacket, session: SessionState) -> str:
-    """Generate the structured Markdown post-interview debrief (`debrief.md`)."""
+def generate_debrief(
+    case_packet: CasePacket,
+    session: SessionState,
+    whiteboard_snapshots: list[tuple[str, bytes]] | None = None,
+) -> str:
+    """Generate the structured Markdown post-interview debrief (`debrief.md`), including multimodal whiteboard review."""
     if settings.demo_mode:
         return _demo_debrief(case_packet, session)
 
@@ -147,6 +155,17 @@ def generate_debrief(case_packet: CasePacket, session: SessionState) -> str:
     transcript = _format_full_transcript(session)
     eval_focus = "\n".join(f"- {item}" for item in case_packet.evaluation_focus)
     hidden_facts = "\n".join(f"- {k}: {v}" for k, v in case_packet.hidden_facts.items())
+
+    snapshot_names = [name for name, _ in (whiteboard_snapshots or [])]
+    wb_context = (
+        f"Attached whiteboard milestone PNG snapshots (in chronological order): {', '.join(snapshot_names)}."
+        if snapshot_names
+        else (
+            "Whiteboard was enabled, but no drawings were captured during the session."
+            if session.whiteboard_enabled
+            else "Candidate ran this session in Audio-Only Mode (whiteboard disabled)."
+        )
+    )
 
     prompt = f"""You are a calibrated Bar-Raiser Product Management Interview Evaluator reviewing a voice-first Product Sense interview for {case_packet.company} ({case_packet.role}).
 
@@ -160,28 +179,36 @@ HIDDEN CASE FACTS (to judge whether the candidate uncovered key constraints):
 SESSION TELEMETRY:
 {metrics}
 
+WHITEBOARD EVIDENCE:
+{wb_context}
+
 FULL TIMESTAMPED TRANSCRIPT:
 {transcript}
 
 Write a rigorous, candid, actionable Markdown debrief following this exact structure:
-1. `# Post-Interview Debrief: {case_packet.title}` with metadata header (Company, Role, Elapsed Time, Spoken Turns, Avg Turn Length, Silence Nudges).
+1. `# Post-Interview Debrief: {case_packet.title}` with metadata header (Company, Role, Elapsed Time, Spoken Turns, Avg Turn Length, Silence Nudges, Whiteboard Snapshots).
 2. `## 1. Overall Readiness Verdict` — Choose strictly one of **Strong Hire**, **Lean Hire**, or **Needs Drill**, followed by a sharp 3-sentence executive summary.
-3. `## 2. Dimension Scores (1–5)` — Score each dimension 1–5 with concrete transcript evidence:
+3. `## 2. Dimension Scores (1–5)` — Score each dimension 1–5 with concrete transcript & whiteboard evidence:
    - **Structure & Signposting**
    - **Thinking Out Loud**
    - **Clarity & Conciseness**
    - **Product Sense & Trade-Off Rigor**
-   - **Architectural & Trust-by-Design Clarity** (note Phase 1 is audio-only; assess how clearly they communicated Core vs. App boundaries verbally)
-4. `## 3. Moment-by-Moment Replay (Top 3–5 Turning Points)` — For each turning point, cite the exact timestamp and quote from the candidate, explain why it worked or lost the room, and provide a concrete **30-Second Upgrade Answer** phrased crisply in first person.
+   - **Whiteboard Effectiveness** (inspect the attached Excalidraw PNGs: did the diagram reinforce the spoken narrative, clearly separate Core vs. App layers / trade-offs, or leave key concepts undocumented/messy? Mark N/A only if Audio-Only Mode was selected)
+4. `## 3. Moment-by-Moment Replay (Top 3–5 Turning Points)` — For each turning point, cite the exact timestamp, quote from the candidate, and reference the relevant whiteboard snapshot filename if applicable, explain why it worked or lost the room, and provide a concrete **30-Second Upgrade Answer** phrased crisply in first person.
 5. `## 4. Targeted Drill for Next Session` — 1–2 concrete micro-drills tailored directly to their biggest gap in this session.
 
 Be direct, high-bar, and specific to {case_packet.company}. Do not flatter generic answers."""
+
+    contents: list[object] = [prompt]
+    for name, png_bytes in (whiteboard_snapshots or []):
+        contents.append(f"Whiteboard snapshot: {name}")
+        contents.append(types.Part.from_bytes(data=png_bytes, mime_type="image/png"))
 
     try:
         client = genai.Client(api_key=settings.gemini_api_key)
         response = client.models.generate_content(
             model=settings.gemini_evaluator_model,
-            contents=prompt,
+            contents=contents,
             config=types.GenerateContentConfig(temperature=0.35),
         )
         text = (response.text or "").strip()

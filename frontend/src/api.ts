@@ -5,6 +5,7 @@ import type {
   SessionSummary,
   TranscriptTurn,
   TurnResponse,
+  WhiteboardSnapshotMeta,
 } from './types';
 
 async function handleJson<T>(res: Response): Promise<T> {
@@ -45,6 +46,7 @@ export const api = {
     silence_nudge_seconds: number;
     tts_enabled: boolean;
     tts_provider: 'browser' | 'elevenlabs';
+    whiteboard_enabled: boolean;
   }): Promise<SessionState> {
     return fetch('/api/sessions', {
       method: 'POST',
@@ -78,6 +80,9 @@ export const api = {
     audioBlob: Blob | null;
     elapsedSeconds: number;
     speakingDurationSeconds: number;
+    whiteboardPng?: Blob | null;
+    whiteboardDiff?: Record<string, unknown> | null;
+    whiteboardScene?: string | null;
   }): Promise<TurnResponse> {
     const form = new FormData();
     form.append('elapsed_seconds', String(Math.max(0, Math.floor(params.elapsedSeconds))));
@@ -86,10 +91,45 @@ export const api = {
       const ext = params.audioBlob.type.includes('mp4') ? 'm4a' : 'webm';
       form.append('audio', params.audioBlob, `turn.${ext}`);
     }
+    if (params.whiteboardPng) {
+      form.append('whiteboard_png', params.whiteboardPng, 'whiteboard.png');
+    }
+    if (params.whiteboardDiff) {
+      form.append('whiteboard_diff', JSON.stringify(params.whiteboardDiff));
+    }
+    if (params.whiteboardScene) {
+      form.append('whiteboard_scene', params.whiteboardScene);
+    }
     return fetch(`/api/sessions/${encodeURIComponent(params.sessionId)}/turn`, {
       method: 'POST',
       body: form,
     }).then((r) => handleJson<TurnResponse>(r));
+  },
+
+  saveFinalWhiteboard(params: {
+    sessionId: string;
+    elapsedSeconds: number;
+    elementCount: number;
+    whiteboardPng: Blob | null;
+    whiteboardScene: string | null;
+  }): Promise<WhiteboardSnapshotMeta | null> {
+    const form = new FormData();
+    form.append('elapsed_seconds', String(Math.max(0, Math.floor(params.elapsedSeconds))));
+    form.append('element_count', String(params.elementCount));
+    if (params.whiteboardPng) {
+      form.append('whiteboard_png', params.whiteboardPng, 'final.png');
+    }
+    if (params.whiteboardScene) {
+      form.append('whiteboard_scene', params.whiteboardScene);
+    }
+    return fetch(`/api/sessions/${encodeURIComponent(params.sessionId)}/whiteboard`, {
+      method: 'POST',
+      body: form,
+    }).then((r) => handleJson<WhiteboardSnapshotMeta | null>(r));
+  },
+
+  snapshotUrl(sessionId: string, filename: string): string {
+    return `/api/sessions/${encodeURIComponent(sessionId)}/snapshots/${encodeURIComponent(filename)}`;
   },
 
   recordNudge(sessionId: string, elapsedSeconds: number): Promise<TranscriptTurn> {

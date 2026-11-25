@@ -36,6 +36,16 @@ export interface CaseSummary {
   evaluation_focus: string[];
 }
 
+export interface WhiteboardSnapshotMeta {
+  filename: string;
+  turn_id: string | null;
+  phase: PhaseId;
+  elapsed_seconds: number;
+  element_count: number;
+  diff_summary: string | null;
+  timestamp: string;
+}
+
 export interface TranscriptTurn {
   id: string;
   role: 'candidate' | 'interviewer' | 'system';
@@ -49,6 +59,8 @@ export interface TranscriptTurn {
   is_nudge: boolean;
   curveball_index: number | null;
   delivery_notes: string | null;
+  whiteboard_snapshot: string | null;
+  whiteboard_diff_summary: string | null;
 }
 
 export interface SessionState {
@@ -65,6 +77,7 @@ export interface SessionState {
   silence_nudge_seconds: number;
   tts_enabled: boolean;
   tts_provider: TTSProvider;
+  whiteboard_enabled: boolean;
   demo_mode: boolean;
   current_phase: PhaseInfo;
   phases: PhaseInfo[];
@@ -73,6 +86,8 @@ export interface SessionState {
   interviewers: InterviewerPersona[];
   candidate_brief_markdown: string;
   turns: TranscriptTurn[];
+  whiteboard_snapshots: WhiteboardSnapshotMeta[];
+  has_final_excalidraw: boolean;
   debrief_markdown: string | null;
 }
 
@@ -97,6 +112,7 @@ export interface TurnResponse {
   current_phase: PhaseInfo;
   elapsed_seconds: number;
   curveballs_injected: number[];
+  whiteboard_snapshot: WhiteboardSnapshotMeta | null;
   should_hard_stop: boolean;
 }
 
