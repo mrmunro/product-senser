@@ -86,6 +86,7 @@ class Storage:
         reading_grace_seconds: int = 120,
         silence_nudge_seconds: int = 60,
         tts_enabled: bool = True,
+        tts_provider: str = "browser",
         demo_mode: bool = False,
     ) -> SessionState:
         now = datetime.now(timezone.utc)
@@ -117,6 +118,7 @@ class Storage:
             reading_grace_seconds=reading_grace_seconds,
             silence_nudge_seconds=silence_nudge_seconds,
             tts_enabled=tts_enabled,
+            tts_provider=tts_provider,  # type: ignore[arg-type]
             demo_mode=demo_mode,
             current_phase=current_phase,
             phases=phases,

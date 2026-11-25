@@ -125,3 +125,32 @@ def test_end_to_end_session_lifecycle(tmp_path: Path, monkeypatch):
     sessions_list = client.get("/api/sessions")
     assert sessions_list.status_code == 200
     assert any(s["session_id"] == session_id and s["has_debrief"] for s in sessions_list.json())
+
+
+def test_elevenlabs_tts_endpoint_and_toggle(monkeypatch):
+    client = TestClient(main.app)
+
+    # Unconfigured by default -> 400 and health reports unavailable
+    monkeypatch.setattr(settings, "elevenlabs_api_key", "")
+    health = client.get("/api/health").json()
+    assert health["elevenlabs_available"] is False
+
+    res = client.post("/api/tts", json={"text": "Hello from Sokin"})
+    assert res.status_code == 400
+
+    # Configured -> health reports available and /api/tts returns audio/mpeg
+    monkeypatch.setattr(settings, "elevenlabs_api_key", "test-el-key")
+
+    async def fake_synth(text: str, voice_id=None) -> bytes:
+        assert "Sokin" in text
+        return b"ID3-fake-mp3-bytes"
+
+    monkeypatch.setattr(main, "synthesize_elevenlabs", fake_synth)
+
+    health2 = client.get("/api/health").json()
+    assert health2["elevenlabs_available"] is True
+
+    res2 = client.post("/api/tts", json={"text": "Hello from Sokin"})
+    assert res2.status_code == 200
+    assert res2.headers["content-type"].startswith("audio/mpeg")
+    assert res2.content == b"ID3-fake-mp3-bytes"

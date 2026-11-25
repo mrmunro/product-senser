@@ -3,7 +3,13 @@ import { api } from './api';
 import { DebriefView } from './components/DebriefView';
 import { InterviewRoom } from './components/InterviewRoom';
 import { Lobby } from './components/Lobby';
-import type { CaseSummary, HealthResponse, SessionState, SessionSummary } from './types';
+import type {
+  CaseSummary,
+  HealthResponse,
+  SessionState,
+  SessionSummary,
+  TTSProvider,
+} from './types';
 
 type View = 'lobby' | 'interview' | 'debrief';
 
@@ -43,6 +49,7 @@ export function App() {
     caseId: string,
     silenceNudgeSeconds: number,
     ttsEnabled: boolean,
+    ttsProvider: TTSProvider,
   ) => {
     setStarting(true);
     try {
@@ -50,6 +57,7 @@ export function App() {
         case_id: caseId,
         silence_nudge_seconds: silenceNudgeSeconds,
         tts_enabled: ttsEnabled,
+        tts_provider: ttsProvider,
       });
       setActiveSession(created);
       setView('interview');
@@ -104,6 +112,7 @@ export function App() {
     return (
       <InterviewRoom
         initialSession={activeSession}
+        elevenlabsAvailable={Boolean(health?.elevenlabs_available)}
         onSessionCompleted={handleSessionCompleted}
         onExitToLobby={handleBackToLobby}
       />
@@ -120,7 +129,9 @@ export function App() {
       cases={cases}
       sessions={sessions}
       starting={starting}
-      onStartSession={(caseId, nudge, tts) => void handleStartSession(caseId, nudge, tts)}
+      onStartSession={(caseId, nudge, tts, provider) =>
+        void handleStartSession(caseId, nudge, tts, provider)
+      }
       onOpenSession={(id) => void handleOpenSession(id)}
     />
   );

@@ -93,6 +93,7 @@ class SessionState(BaseModel):
     reading_grace_seconds: int = 120
     silence_nudge_seconds: int = 60
     tts_enabled: bool = True
+    tts_provider: Literal["browser", "elevenlabs"] = "browser"
     demo_mode: bool = False
     current_phase: PhaseInfo
     phases: list[PhaseInfo]
@@ -124,6 +125,12 @@ class CreateSessionRequest(BaseModel):
     reading_grace_seconds: int = Field(default=120, ge=0, le=600)
     silence_nudge_seconds: int = Field(default=60, ge=0, le=300)
     tts_enabled: bool = True
+    tts_provider: Literal["browser", "elevenlabs"] = "browser"
+
+
+class TTSRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=3000)
+    voice_id: Optional[str] = None
 
 
 class NudgeRequest(BaseModel):

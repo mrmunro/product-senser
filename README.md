@@ -9,7 +9,7 @@ A local, voice-first **45-minute Product Sense interview simulator** built from 
   - Text input is disabled during active interviews to enforce thinking out loud.
   - **45-Minute Countdown Timer & 6-Phase Progress Bar** (`Brief & Clarify` → `Framing & Strategy` → `Deep Dive` → `Curveball` → `Executive Wrap-Up` → `Hard Stop`).
   - **Thinking-Out-Loud Guardrails:** Configurable silence nudge timer (45s / 60s / 90s / Off) + turn-length color indicator (**amber at 2:30**, **red at 3:30**).
-  - **Toggleable Interviewer Voice (TTS):** Web Speech API playback on by default, with live text transcript and per-turn replay.
+  - **Toggleable Interviewer Voice (TTS):** Switch between the default browser Web Speech voice and **ElevenLabs** (when `ELEVENLABS_API_KEY` is set in `.env`), with live text transcript and per-turn replay.
   - **Two-Pane Layout:** Case Brief viewer on the left (with Phase 2 Excalidraw Whiteboard slot) and Interview Console on the right.
 - **FastAPI Backend & Agents (`backend/`):**
   - Single-roundtrip **Gemini 2.5 Flash** native audio transcription + active panel interviewer agent (`google-genai`).

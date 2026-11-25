@@ -44,12 +44,33 @@ export const api = {
     case_id: string;
     silence_nudge_seconds: number;
     tts_enabled: boolean;
+    tts_provider: 'browser' | 'elevenlabs';
   }): Promise<SessionState> {
     return fetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
     }).then((r) => handleJson<SessionState>(r));
+  },
+
+  async synthesizeSpeech(text: string, signal?: AbortSignal): Promise<Blob> {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal,
+    });
+    if (!res.ok) {
+      let message = `TTS request failed (${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.detail) message = String(body.detail);
+      } catch {
+        // ignore parse failure
+      }
+      throw new Error(message);
+    }
+    return res.blob();
   },
 
   submitTurn(params: {

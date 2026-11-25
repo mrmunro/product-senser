@@ -20,6 +20,7 @@ import type { PhaseInfo, SessionState, TranscriptTurn } from '../types';
 
 interface InterviewRoomProps {
   initialSession: SessionState;
+  elevenlabsAvailable: boolean;
   onSessionCompleted: (completed: SessionState) => void;
   onExitToLobby: () => void;
 }
@@ -41,6 +42,7 @@ function getPhaseForElapsed(phases: PhaseInfo[], elapsedSeconds: number): PhaseI
 
 export function InterviewRoom({
   initialSession,
+  elevenlabsAvailable,
   onSessionCompleted,
   onExitToLobby,
 }: InterviewRoomProps) {
@@ -57,7 +59,11 @@ export function InterviewRoom({
   const hasEndedRef = useRef(false);
   const spokeOpeningRef = useRef(false);
 
-  const tts = useTTS(initialSession.tts_enabled);
+  const tts = useTTS(
+    initialSession.tts_enabled,
+    initialSession.tts_provider ?? 'browser',
+    elevenlabsAvailable,
+  );
 
   const totalDurationSeconds = session.duration_minutes * 60;
   const remainingSeconds = Math.max(0, totalDurationSeconds - elapsedSeconds);
@@ -253,6 +259,19 @@ export function InterviewRoom({
             <span>{tts.enabled ? 'Voice On' : 'Muted'}</span>
           </button>
 
+          {tts.enabled && elevenlabsAvailable && (
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() =>
+                tts.setProvider(tts.provider === 'elevenlabs' ? 'browser' : 'elevenlabs')
+              }
+              title="Toggle between Browser default voice and ElevenLabs voice"
+            >
+              <span>{tts.provider === 'elevenlabs' ? 'Voice: ElevenLabs' : 'Voice: Browser'}</span>
+            </button>
+          )}
+
           <button
             type="button"
             className="danger-btn"
@@ -405,10 +424,10 @@ export function InterviewRoom({
           </div>
 
           <div className="ptt-dock">
-            {(error || ptt.micError) && (
+            {(error || ptt.micError || tts.ttsWarning) && (
               <div className="error-banner">
                 <AlertTriangle size={15} />
-                <span>{error || ptt.micError}</span>
+                <span>{error || ptt.micError || tts.ttsWarning}</span>
               </div>
             )}
 

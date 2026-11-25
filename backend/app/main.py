@@ -6,6 +6,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 
 from app.agents.evaluator import generate_debrief
 from app.agents.interviewer import build_opening_turn, run_interviewer_turn
@@ -20,10 +21,12 @@ from app.models import (
     SessionState,
     SessionSummary,
     TranscriptTurn,
+    TTSRequest,
     TurnResponse,
 )
 from app.phase_machine import get_phase_for_elapsed, should_inject_curveball
 from app.storage import Storage
+from app.tts import synthesize_elevenlabs
 
 app = FastAPI(
     title="Product Sense Interview Harness API",
@@ -54,7 +57,23 @@ def health() -> dict[str, object]:
         "demo_mode": settings.demo_mode,
         "interviewer_model": settings.gemini_interviewer_model,
         "evaluator_model": settings.gemini_evaluator_model,
+        "elevenlabs_available": settings.elevenlabs_configured,
+        "elevenlabs_voice_id": settings.elevenlabs_voice_id if settings.elevenlabs_configured else None,
     }
+
+
+@app.post("/api/tts")
+async def text_to_speech(payload: TTSRequest) -> Response:
+    if not settings.elevenlabs_configured:
+        raise HTTPException(
+            status_code=400,
+            detail="ElevenLabs TTS is not configured. Set ELEVENLABS_API_KEY in .env.",
+        )
+    try:
+        audio_bytes = await synthesize_elevenlabs(text=payload.text, voice_id=payload.voice_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return Response(content=audio_bytes, media_type="audio/mpeg")
 
 
 @app.get("/api/cases", response_model=list[CaseSummary])
@@ -81,11 +100,17 @@ def create_session(payload: CreateSessionRequest) -> SessionState:
     if not case_packet:
         raise HTTPException(status_code=404, detail=f"Case '{payload.case_id}' not found")
 
+    tts_provider = (
+        payload.tts_provider
+        if (payload.tts_provider == "elevenlabs" and settings.elevenlabs_configured)
+        else "browser"
+    )
     session = storage.create_session(
         case_packet=case_packet,
         reading_grace_seconds=payload.reading_grace_seconds,
         silence_nudge_seconds=payload.silence_nudge_seconds,
         tts_enabled=payload.tts_enabled,
+        tts_provider=tts_provider,
         demo_mode=settings.demo_mode,
     )
 

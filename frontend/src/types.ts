@@ -1,3 +1,5 @@
+export type TTSProvider = 'browser' | 'elevenlabs';
+
 export type PhaseId =
   | 'brief_clarify'
   | 'framing_strategy'
@@ -62,6 +64,7 @@ export interface SessionState {
   reading_grace_seconds: number;
   silence_nudge_seconds: number;
   tts_enabled: boolean;
+  tts_provider: TTSProvider;
   demo_mode: boolean;
   current_phase: PhaseInfo;
   phases: PhaseInfo[];
@@ -102,4 +105,6 @@ export interface HealthResponse {
   demo_mode: boolean;
   interviewer_model: string;
   evaluator_model: string;
+  elevenlabs_available: boolean;
+  elevenlabs_voice_id: string | null;
 }

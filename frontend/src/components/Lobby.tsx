@@ -9,14 +9,19 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import type { CaseSummary, HealthResponse, SessionSummary } from '../types';
+import type { CaseSummary, HealthResponse, SessionSummary, TTSProvider } from '../types';
 
 interface LobbyProps {
   health: HealthResponse | null;
   cases: CaseSummary[];
   sessions: SessionSummary[];
   starting: boolean;
-  onStartSession: (caseId: string, silenceNudgeSeconds: number, ttsEnabled: boolean) => void;
+  onStartSession: (
+    caseId: string,
+    silenceNudgeSeconds: number,
+    ttsEnabled: boolean,
+    ttsProvider: TTSProvider,
+  ) => void;
   onOpenSession: (sessionId: string) => void;
 }
 
@@ -37,6 +42,11 @@ export function Lobby({
   const [selectedCaseId, setSelectedCaseId] = useState<string>(cases[0]?.id ?? '');
   const [silenceNudgeSeconds, setSilenceNudgeSeconds] = useState<number>(60);
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(true);
+  const [ttsProvider, setTtsProvider] = useState<TTSProvider>('browser');
+
+  const elevenlabsAvailable = Boolean(health?.elevenlabs_available);
+  const effectiveProvider: TTSProvider =
+    ttsProvider === 'elevenlabs' && elevenlabsAvailable ? 'elevenlabs' : 'browser';
 
   const activeCaseId = selectedCaseId || cases[0]?.id || '';
   const selectedCase = cases.find((c) => c.id === activeCaseId) ?? cases[0];
@@ -143,11 +153,46 @@ export function Lobby({
                   </button>
                 </div>
 
+                {ttsEnabled && (
+                  <div className="control-group">
+                    <label>TTS Voice Engine</label>
+                    <div className="segmented-control">
+                      <button
+                        type="button"
+                        className={`seg-btn ${effectiveProvider === 'browser' ? 'active' : ''}`}
+                        onClick={() => setTtsProvider('browser')}
+                      >
+                        Browser (Default)
+                      </button>
+                      <button
+                        type="button"
+                        className={`seg-btn ${effectiveProvider === 'elevenlabs' ? 'active' : ''}`}
+                        disabled={!elevenlabsAvailable}
+                        onClick={() => setTtsProvider('elevenlabs')}
+                        title={
+                          elevenlabsAvailable
+                            ? 'Use ElevenLabs voice for interviewer replies'
+                            : 'Set ELEVENLABS_API_KEY in .env to enable ElevenLabs TTS'
+                        }
+                      >
+                        ElevenLabs
+                      </button>
+                    </div>
+                    {!elevenlabsAvailable && (
+                      <span className="field-hint">
+                        Add <code>ELEVENLABS_API_KEY</code> in <code>.env</code> to enable ElevenLabs.
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <button
                   type="button"
                   className="primary-btn start-btn"
                   disabled={starting || !activeCaseId}
-                  onClick={() => onStartSession(activeCaseId, silenceNudgeSeconds, ttsEnabled)}
+                  onClick={() =>
+                    onStartSession(activeCaseId, silenceNudgeSeconds, ttsEnabled, effectiveProvider)
+                  }
                 >
                   <Mic size={18} />
                   {starting ? 'Starting Session…' : `Start ${selectedCase.duration_minutes}-Min Voice Interview`}
