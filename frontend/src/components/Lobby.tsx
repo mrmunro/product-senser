@@ -21,6 +21,7 @@ interface LobbyProps {
     silenceNudgeSeconds: number,
     ttsEnabled: boolean,
     ttsProvider: TTSProvider,
+    whiteboardEnabled: boolean,
   ) => void;
   onOpenSession: (sessionId: string) => void;
 }
@@ -43,6 +44,7 @@ export function Lobby({
   const [silenceNudgeSeconds, setSilenceNudgeSeconds] = useState<number>(60);
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(true);
   const [ttsProvider, setTtsProvider] = useState<TTSProvider>('browser');
+  const [whiteboardEnabled, setWhiteboardEnabled] = useState<boolean>(true);
 
   const elevenlabsAvailable = Boolean(health?.elevenlabs_available);
   const effectiveProvider: TTSProvider =
@@ -56,7 +58,7 @@ export function Lobby({
       <header className="lobby-header">
         <div>
           <div className="brand-row">
-            <span className="brand-badge">Phase 1 · Voice-First Simulator</span>
+            <span className="brand-badge">Phase 2 · Voice + Excalidraw Whiteboard</span>
             {health && (
               <span className={`mode-pill ${health.demo_mode ? 'demo' : 'live'}`}>
                 <Sparkles size={13} />
@@ -186,12 +188,38 @@ export function Lobby({
                   </div>
                 )}
 
+                <div className="control-group">
+                  <label>Interview Mode</label>
+                  <div className="segmented-control">
+                    <button
+                      type="button"
+                      className={`seg-btn ${whiteboardEnabled ? 'active' : ''}`}
+                      onClick={() => setWhiteboardEnabled(true)}
+                    >
+                      Voice + Whiteboard
+                    </button>
+                    <button
+                      type="button"
+                      className={`seg-btn ${!whiteboardEnabled ? 'active' : ''}`}
+                      onClick={() => setWhiteboardEnabled(false)}
+                    >
+                      Audio-Only Mode
+                    </button>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   className="primary-btn start-btn"
                   disabled={starting || !activeCaseId}
                   onClick={() =>
-                    onStartSession(activeCaseId, silenceNudgeSeconds, ttsEnabled, effectiveProvider)
+                    onStartSession(
+                      activeCaseId,
+                      silenceNudgeSeconds,
+                      ttsEnabled,
+                      effectiveProvider,
+                      whiteboardEnabled,
+                    )
                   }
                 >
                   <Mic size={18} />

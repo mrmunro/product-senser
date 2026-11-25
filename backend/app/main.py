@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 
 from app.agents.evaluator import generate_debrief
 from app.agents.interviewer import build_opening_turn, run_interviewer_turn
@@ -23,6 +24,7 @@ from app.models import (
     TranscriptTurn,
     TTSRequest,
     TurnResponse,
+    WhiteboardSnapshotMeta,
 )
 from app.phase_machine import get_phase_for_elapsed, should_inject_curveball
 from app.storage import Storage
@@ -111,6 +113,7 @@ def create_session(payload: CreateSessionRequest) -> SessionState:
         silence_nudge_seconds=payload.silence_nudge_seconds,
         tts_enabled=payload.tts_enabled,
         tts_provider=tts_provider,
+        whiteboard_enabled=payload.whiteboard_enabled,
         demo_mode=settings.demo_mode,
     )
 
@@ -145,6 +148,9 @@ async def submit_turn(
     speaking_duration_seconds: float = Form(0.0, ge=0.0),
     audio: Optional[UploadFile] = File(None),
     demo_transcript: Optional[str] = Form(None),
+    whiteboard_png: Optional[UploadFile] = File(None),
+    whiteboard_diff: Optional[str] = Form(None),
+    whiteboard_scene: Optional[str] = Form(None),
 ) -> TurnResponse:
     session = storage.get_session(session_id)
     if not session:
@@ -166,6 +172,24 @@ async def submit_turn(
     if not settings.demo_mode and not audio_bytes and not demo_transcript:
         raise HTTPException(status_code=400, detail="Audio recording is required")
 
+    wb_png_bytes: Optional[bytes] = None
+    if whiteboard_png is not None:
+        raw_png = await whiteboard_png.read()
+        if raw_png:
+            wb_png_bytes = raw_png
+
+    wb_diff_parsed: Optional[dict[str, object]] = None
+    wb_diff_summary: Optional[str] = None
+    wb_element_count = 0
+    if whiteboard_diff:
+        try:
+            wb_diff_parsed = json.loads(whiteboard_diff)
+            if isinstance(wb_diff_parsed, dict):
+                wb_diff_summary = str(wb_diff_parsed.get("summary") or "").strip() or None
+                wb_element_count = int(wb_diff_parsed.get("element_count") or 0)
+        except Exception:
+            wb_diff_summary = whiteboard_diff[:300]
+
     phase = get_phase_for_elapsed(elapsed_seconds, session.duration_minutes)
     curveball_idx = should_inject_curveball(
         phase=phase,
@@ -186,13 +210,39 @@ async def submit_turn(
             audio_bytes=audio_bytes,
             audio_mime_type=audio_mime,
             transcript_override=demo_transcript,
+            whiteboard_png_bytes=wb_png_bytes,
+            whiteboard_diff=wb_diff_parsed,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     now = datetime.now(timezone.utc)
+    candidate_turn_id = uuid.uuid4().hex[:10]
+
+    snapshot_meta: Optional[WhiteboardSnapshotMeta] = None
+    if wb_png_bytes:
+        snap_index = len(session.whiteboard_snapshots) + 1
+        mins = elapsed_seconds // 60
+        secs = elapsed_seconds % 60
+        snap_filename = f"turn-{snap_index:02d}-{mins:02d}m{secs:02d}s.png"
+        storage.save_whiteboard_snapshot(session_id, snap_filename, wb_png_bytes)
+        snapshot_meta = WhiteboardSnapshotMeta(
+            filename=snap_filename,
+            turn_id=candidate_turn_id,
+            phase=phase.id,
+            elapsed_seconds=elapsed_seconds,
+            element_count=wb_element_count,
+            diff_summary=wb_diff_summary,
+            timestamp=now,
+        )
+        session.whiteboard_snapshots.append(snapshot_meta)
+
+    if whiteboard_scene:
+        storage.save_whiteboard_scene(session_id, whiteboard_scene)
+        session.has_final_excalidraw = True
+
     candidate_turn = TranscriptTurn(
-        id=uuid.uuid4().hex[:10],
+        id=candidate_turn_id,
         role="candidate",
         speaker_name="You",
         speaker_role="Candidate",
@@ -202,6 +252,8 @@ async def submit_turn(
         speaking_duration_seconds=round(speaking_duration_seconds, 1),
         timestamp=now,
         delivery_notes=result.delivery_notes,
+        whiteboard_snapshot=snapshot_meta.filename if snapshot_meta else None,
+        whiteboard_diff_summary=wb_diff_summary,
     )
     interviewer_turn = TranscriptTurn(
         id=uuid.uuid4().hex[:10],
@@ -230,8 +282,59 @@ async def submit_turn(
         current_phase=phase,
         elapsed_seconds=session.elapsed_seconds,
         curveballs_injected=session.curveballs_injected,
+        whiteboard_snapshot=snapshot_meta,
         should_hard_stop=(phase.id == PhaseId.HARD_STOP),
     )
+
+
+@app.post("/api/sessions/{session_id}/whiteboard", response_model=Optional[WhiteboardSnapshotMeta])
+async def save_final_whiteboard(
+    session_id: str,
+    elapsed_seconds: int = Form(..., ge=0),
+    element_count: int = Form(0, ge=0),
+    whiteboard_png: Optional[UploadFile] = File(None),
+    whiteboard_scene: Optional[str] = Form(None),
+) -> Optional[WhiteboardSnapshotMeta]:
+    session = storage.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+    snapshot_meta: Optional[WhiteboardSnapshotMeta] = None
+    if whiteboard_png is not None:
+        png_bytes = await whiteboard_png.read()
+        if png_bytes:
+            phase = get_phase_for_elapsed(elapsed_seconds, session.duration_minutes)
+            filename = "final.png"
+            storage.save_whiteboard_snapshot(session_id, filename, png_bytes)
+            snapshot_meta = WhiteboardSnapshotMeta(
+                filename=filename,
+                phase=phase.id,
+                elapsed_seconds=elapsed_seconds,
+                element_count=element_count,
+                diff_summary="Final whiteboard state captured at session end.",
+                timestamp=datetime.now(timezone.utc),
+            )
+            # Replace any prior final.png entry
+            session.whiteboard_snapshots = [
+                s for s in session.whiteboard_snapshots if s.filename != filename
+            ]
+            session.whiteboard_snapshots.append(snapshot_meta)
+
+    if whiteboard_scene:
+        storage.save_whiteboard_scene(session_id, whiteboard_scene)
+        session.has_final_excalidraw = True
+
+    storage.save_session(session)
+    return snapshot_meta
+
+
+@app.get("/api/sessions/{session_id}/snapshots/{filename}")
+def get_whiteboard_snapshot(session_id: str, filename: str) -> FileResponse:
+    path = storage.get_whiteboard_file(session_id, filename)
+    if not path:
+        raise HTTPException(status_code=404, detail="Whiteboard snapshot not found")
+    media_type = "application/json" if filename.endswith(".excalidraw") else "image/png"
+    return FileResponse(path=path, media_type=media_type, filename=filename)
 
 
 @app.post("/api/sessions/{session_id}/nudge", response_model=TranscriptTurn)
@@ -279,7 +382,12 @@ def end_session(session_id: str, payload: EndSessionRequest) -> SessionState:
     session.current_phase = get_phase_for_elapsed(session.elapsed_seconds, session.duration_minutes)
     session.status = "completed"
     session.ended_at = datetime.now(timezone.utc)
-    session.debrief_markdown = generate_debrief(case_packet, session)
+    milestone_snapshots = storage.read_milestone_snapshots(session_id, max_count=4)
+    session.debrief_markdown = generate_debrief(
+        case_packet,
+        session,
+        whiteboard_snapshots=milestone_snapshots,
+    )
 
     storage.save_session(session)
     return session

@@ -65,6 +65,16 @@ class CandidateCaseView(CaseSummary):
     candidate_brief_markdown: str
 
 
+class WhiteboardSnapshotMeta(BaseModel):
+    filename: str
+    turn_id: Optional[str] = None
+    phase: PhaseId
+    elapsed_seconds: int
+    element_count: int = 0
+    diff_summary: Optional[str] = None
+    timestamp: datetime
+
+
 class TranscriptTurn(BaseModel):
     id: str
     role: Literal["candidate", "interviewer", "system"]
@@ -78,6 +88,8 @@ class TranscriptTurn(BaseModel):
     is_nudge: bool = False
     curveball_index: Optional[int] = None
     delivery_notes: Optional[str] = None
+    whiteboard_snapshot: Optional[str] = None
+    whiteboard_diff_summary: Optional[str] = None
 
 
 class SessionState(BaseModel):
@@ -94,6 +106,7 @@ class SessionState(BaseModel):
     silence_nudge_seconds: int = 60
     tts_enabled: bool = True
     tts_provider: Literal["browser", "elevenlabs"] = "browser"
+    whiteboard_enabled: bool = True
     demo_mode: bool = False
     current_phase: PhaseInfo
     phases: list[PhaseInfo]
@@ -102,6 +115,8 @@ class SessionState(BaseModel):
     interviewers: list[InterviewerPersona] = Field(default_factory=list)
     candidate_brief_markdown: str = ""
     turns: list[TranscriptTurn] = Field(default_factory=list)
+    whiteboard_snapshots: list[WhiteboardSnapshotMeta] = Field(default_factory=list)
+    has_final_excalidraw: bool = False
     debrief_markdown: Optional[str] = None
 
 
@@ -126,6 +141,7 @@ class CreateSessionRequest(BaseModel):
     silence_nudge_seconds: int = Field(default=60, ge=0, le=300)
     tts_enabled: bool = True
     tts_provider: Literal["browser", "elevenlabs"] = "browser"
+    whiteboard_enabled: bool = True
 
 
 class TTSRequest(BaseModel):
@@ -147,4 +163,5 @@ class TurnResponse(BaseModel):
     current_phase: PhaseInfo
     elapsed_seconds: int
     curveballs_injected: list[int]
+    whiteboard_snapshot: Optional[WhiteboardSnapshotMeta] = None
     should_hard_stop: bool = False

@@ -80,6 +80,48 @@ class Storage:
     def _session_dir(self, session_id: str) -> Path:
         return self.sessions_dir / session_id
 
+    def _whiteboard_dir(self, session_id: str) -> Path:
+        return self._session_dir(session_id) / "whiteboard-snapshots"
+
+    def save_whiteboard_snapshot(self, session_id: str, filename: str, png_bytes: bytes) -> Path:
+        wb_dir = self._whiteboard_dir(session_id)
+        wb_dir.mkdir(parents=True, exist_ok=True)
+        safe_name = Path(filename).name
+        target = wb_dir / safe_name
+        target.write_bytes(png_bytes)
+        return target
+
+    def save_whiteboard_scene(self, session_id: str, scene_json: str) -> Path:
+        wb_dir = self._whiteboard_dir(session_id)
+        wb_dir.mkdir(parents=True, exist_ok=True)
+        target = wb_dir / "final.excalidraw"
+        target.write_text(scene_json, encoding="utf-8")
+        return target
+
+    def get_whiteboard_file(self, session_id: str, filename: str) -> Optional[Path]:
+        safe_name = Path(filename).name
+        if safe_name != filename or ".." in safe_name:
+            return None
+        target = self._whiteboard_dir(session_id) / safe_name
+        if not target.exists() or not target.is_file():
+            return None
+        return target
+
+    def read_milestone_snapshots(self, session_id: str, max_count: int = 4) -> list[tuple[str, bytes]]:
+        """Read up to max_count evenly spaced PNG snapshots (always including the latest)."""
+        wb_dir = self._whiteboard_dir(session_id)
+        if not wb_dir.exists():
+            return []
+        pngs = sorted(wb_dir.glob("*.png"))
+        if not pngs:
+            return []
+        if len(pngs) <= max_count:
+            selected = pngs
+        else:
+            indices = sorted({round(i * (len(pngs) - 1) / (max_count - 1)) for i in range(max_count)})
+            selected = [pngs[i] for i in indices]
+        return [(p.name, p.read_bytes()) for p in selected]
+
     def create_session(
         self,
         case_packet: CasePacket,
@@ -87,6 +129,7 @@ class Storage:
         silence_nudge_seconds: int = 60,
         tts_enabled: bool = True,
         tts_provider: str = "browser",
+        whiteboard_enabled: bool = True,
         demo_mode: bool = False,
     ) -> SessionState:
         now = datetime.now(timezone.utc)
@@ -119,6 +162,7 @@ class Storage:
             silence_nudge_seconds=silence_nudge_seconds,
             tts_enabled=tts_enabled,
             tts_provider=tts_provider,  # type: ignore[arg-type]
+            whiteboard_enabled=whiteboard_enabled,
             demo_mode=demo_mode,
             current_phase=current_phase,
             phases=phases,

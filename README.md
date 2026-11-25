@@ -53,6 +53,6 @@ uv run pytest
 ```
 
 ## Roadmap
-- **Phase 1 (this branch):** MVP Voice PTT + 45-min Phase State Machine + Sokin Case Runner + `debrief.md` Evaluator.
-- **Phase 2:** Embedded `@excalidraw/excalidraw` whiteboard in the left pane with turn-synchronized PNG + JSON diff capture.
+- **Phase 1 (merged):** MVP Voice PTT + 45-min Phase State Machine + Sokin Case Runner + `debrief.md` Evaluator + ElevenLabs TTS toggle.
+- **Phase 2 (this branch):** Embedded `@excalidraw/excalidraw` whiteboard in the left pane with turn-synchronized PNG + JSON diff capture, Audio-Only Mode toggle, multimodal Interviewer & Evaluator vision inspection, and Whiteboard Timeline in the Debrief view.
 - **Phase 3:** Antigravity Skill / Case Generator Bridge from any `role-prep/*.md` + public API docs.

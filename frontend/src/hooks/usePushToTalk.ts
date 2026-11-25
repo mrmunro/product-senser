@@ -118,7 +118,12 @@ export function usePushToTalk({
       if (disabled) return;
       if (e.code !== 'Space' || e.repeat) return;
       const target = e.target as HTMLElement | null;
-      if (target && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName)) {
+      if (
+        target &&
+        (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName) ||
+          target.isContentEditable ||
+          Boolean(target.closest('.excalidraw-textEditorContainer')))
+      ) {
         return;
       }
       e.preventDefault();

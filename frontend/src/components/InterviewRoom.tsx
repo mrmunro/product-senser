@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   BookOpen,
   Clock,
+  Image as ImageIcon,
   Layers,
   Loader2,
   Mic,
@@ -17,6 +18,7 @@ import { api } from '../api';
 import { usePushToTalk } from '../hooks/usePushToTalk';
 import { useTTS } from '../hooks/useTTS';
 import type { PhaseInfo, SessionState, TranscriptTurn } from '../types';
+import { WhiteboardPane, type WhiteboardPaneHandle } from './WhiteboardPane';
 
 interface InterviewRoomProps {
   initialSession: SessionState;
@@ -52,9 +54,11 @@ export function InterviewRoom({
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [ending, setEnding] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [audioOnlyMode, setAudioOnlyMode] = useState<boolean>(!initialSession.whiteboard_enabled);
   const [leftTab, setLeftTab] = useState<'brief' | 'whiteboard'>('brief');
 
   const logEndRef = useRef<HTMLDivElement | null>(null);
+  const whiteboardRef = useRef<WhiteboardPaneHandle | null>(null);
   const nudgeInFlightRef = useRef(false);
   const hasEndedRef = useRef(false);
   const spokeOpeningRef = useRef(false);
@@ -102,6 +106,20 @@ export function InterviewRoom({
     setEnding(true);
     setError(null);
     try {
+      if (!audioOnlyMode && whiteboardRef.current) {
+        const finalCapture = await whiteboardRef.current.captureSnapshot().catch(() => null);
+        if (finalCapture) {
+          await api
+            .saveFinalWhiteboard({
+              sessionId: session.session_id,
+              elapsedSeconds,
+              elementCount: finalCapture.elementCount,
+              whiteboardPng: finalCapture.pngBlob,
+              whiteboardScene: finalCapture.sceneJson,
+            })
+            .catch(() => null);
+        }
+      }
       const completed = await api.endSession(session.session_id, elapsedSeconds);
       onSessionCompleted(completed);
     } catch (err) {
@@ -109,7 +127,7 @@ export function InterviewRoom({
       setEnding(false);
       setError(err instanceof Error ? err.message : 'Failed to generate debrief');
     }
-  }, [elapsedSeconds, onSessionCompleted, session.session_id, tts]);
+  }, [audioOnlyMode, elapsedSeconds, onSessionCompleted, session.session_id, tts]);
 
   const handleRecordingComplete = useCallback(
     async (blob: Blob, durationSeconds: number) => {
@@ -117,11 +135,21 @@ export function InterviewRoom({
       setError(null);
       setSilenceSeconds(0);
       try {
+        const wbCapture =
+          !audioOnlyMode && whiteboardRef.current
+            ? await whiteboardRef.current.captureSnapshot().catch(() => null)
+            : null;
+
         const res = await api.submitTurn({
           sessionId: session.session_id,
           audioBlob: blob,
           elapsedSeconds,
           speakingDurationSeconds: durationSeconds,
+          whiteboardPng: wbCapture?.pngBlob ?? null,
+          whiteboardDiff: wbCapture
+            ? (wbCapture.diff as unknown as Record<string, unknown>)
+            : null,
+          whiteboardScene: wbCapture?.sceneJson ?? null,
         });
 
         setSession((prev) => ({
@@ -129,6 +157,9 @@ export function InterviewRoom({
           current_phase: res.current_phase,
           elapsed_seconds: res.elapsed_seconds,
           curveballs_injected: res.curveballs_injected,
+          whiteboard_snapshots: res.whiteboard_snapshot
+            ? [...prev.whiteboard_snapshots, res.whiteboard_snapshot]
+            : prev.whiteboard_snapshots,
           turns: [...prev.turns, res.candidate_turn, res.interviewer_turn],
         }));
 
@@ -146,7 +177,7 @@ export function InterviewRoom({
         setSilenceSeconds(0);
       }
     },
-    [elapsedSeconds, handleEndSession, session.session_id, tts],
+    [audioOnlyMode, elapsedSeconds, handleEndSession, session.session_id, tts],
   );
 
   const ptt = usePushToTalk({
@@ -305,44 +336,62 @@ export function InterviewRoom({
       </div>
 
       <div className="room-panes">
-        {/* LEFT PANE: Case Brief (and Phase 2 Excalidraw slot) */}
+        {/* LEFT PANE: Case Brief + Embedded Excalidraw Whiteboard */}
         <section className="left-pane">
-          <div className="pane-tabs">
+          <div className="pane-tabs pane-tabs-between">
+            <div className="pane-tabs-group">
+              <button
+                type="button"
+                className={`tab-btn ${leftTab === 'brief' ? 'active' : ''}`}
+                onClick={() => setLeftTab('brief')}
+              >
+                <BookOpen size={15} /> Case Brief
+              </button>
+              {!audioOnlyMode && (
+                <button
+                  type="button"
+                  className={`tab-btn ${leftTab === 'whiteboard' ? 'active' : ''}`}
+                  onClick={() => setLeftTab('whiteboard')}
+                >
+                  <Layers size={15} /> Whiteboard
+                  {session.whiteboard_snapshots.length > 0 && (
+                    <span className="phase2-pill">{session.whiteboard_snapshots.length}</span>
+                  )}
+                </button>
+              )}
+            </div>
+
             <button
               type="button"
-              className={`tab-btn ${leftTab === 'brief' ? 'active' : ''}`}
-              onClick={() => setLeftTab('brief')}
+              className={`wb-mode-toggle ${audioOnlyMode ? 'audio-only' : ''}`}
+              onClick={() => {
+                setAudioOnlyMode((prev) => {
+                  const next = !prev;
+                  if (next) setLeftTab('brief');
+                  return next;
+                });
+              }}
+              title="Toggle between Voice + Whiteboard and Audio-Only Mode"
             >
-              <BookOpen size={15} /> Case Brief
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${leftTab === 'whiteboard' ? 'active' : ''}`}
-              onClick={() => setLeftTab('whiteboard')}
-            >
-              <Layers size={15} /> Whiteboard <span className="phase2-pill">Phase 2</span>
+              {audioOnlyMode ? 'Audio-Only Mode (Enable Whiteboard)' : 'Switch to Audio-Only'}
             </button>
           </div>
 
-          {leftTab === 'brief' ? (
-            <div className="brief-scroll markdown-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {session.candidate_brief_markdown}
-              </ReactMarkdown>
-            </div>
-          ) : (
-            <div className="whiteboard-placeholder">
-              <Layers size={36} />
-              <h3>Embedded Excalidraw Whiteboard — Phase 2</h3>
-              <p>
-                In Phase 2, this pane hosts an embedded <code>@excalidraw/excalidraw</code> canvas
-                that automatically captures PNG snapshots and JSON diffs on every Push-to-Talk
-                submit so the Interviewer Agent can inspect and critique your architecture live.
-              </p>
-              <p className="muted">
-                For Phase 1, stay in Audio-First mode and practice verbalising your Core vs.
-                Application boundaries and trade-offs clearly out loud.
-              </p>
+          <div
+            className="brief-scroll markdown-body"
+            style={{ display: leftTab === 'brief' || audioOnlyMode ? 'block' : 'none' }}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {session.candidate_brief_markdown}
+            </ReactMarkdown>
+          </div>
+
+          {!audioOnlyMode && (
+            <div
+              className="whiteboard-tab-host"
+              style={{ display: leftTab === 'whiteboard' ? 'flex' : 'none' }}
+            >
+              <WhiteboardPane ref={whiteboardRef} />
             </div>
           )}
         </section>
@@ -411,6 +460,14 @@ export function InterviewRoom({
                   </div>
                 </div>
                 <p className="turn-text">{turn.text}</p>
+                {turn.whiteboard_snapshot && (
+                  <div className="turn-wb-badge">
+                    <ImageIcon size={13} />
+                    <span>
+                      Whiteboard captured: {turn.whiteboard_diff_summary || turn.whiteboard_snapshot}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
 

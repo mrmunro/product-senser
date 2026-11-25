@@ -50,6 +50,7 @@ export function App() {
     silenceNudgeSeconds: number,
     ttsEnabled: boolean,
     ttsProvider: TTSProvider,
+    whiteboardEnabled: boolean,
   ) => {
     setStarting(true);
     try {
@@ -58,6 +59,7 @@ export function App() {
         silence_nudge_seconds: silenceNudgeSeconds,
         tts_enabled: ttsEnabled,
         tts_provider: ttsProvider,
+        whiteboard_enabled: whiteboardEnabled,
       });
       setActiveSession(created);
       setView('interview');
@@ -129,8 +131,8 @@ export function App() {
       cases={cases}
       sessions={sessions}
       starting={starting}
-      onStartSession={(caseId, nudge, tts, provider) =>
-        void handleStartSession(caseId, nudge, tts, provider)
+      onStartSession={(caseId, nudge, tts, provider, wbEnabled) =>
+        void handleStartSession(caseId, nudge, tts, provider, wbEnabled)
       }
       onOpenSession={(id) => void handleOpenSession(id)}
     />
