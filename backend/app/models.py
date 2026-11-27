@@ -149,6 +149,22 @@ class TTSRequest(BaseModel):
     voice_id: Optional[str] = None
 
 
+class GenerateCaseRequest(BaseModel):
+    source_markdown: str = Field(default="", max_length=120000)
+    urls: list[str] = Field(default_factory=list)
+    topic: Optional[str] = None
+    company: Optional[str] = None
+    role: Optional[str] = None
+    duration_minutes: int = Field(default=45, ge=15, le=90)
+    case_id: Optional[str] = None
+
+
+class GenerateCaseResponse(BaseModel):
+    case: CaseSummary
+    warnings: list[str] = Field(default_factory=list)
+    used_demo_mode: bool = False
+
+
 class NudgeRequest(BaseModel):
     elapsed_seconds: int = Field(ge=0)
 

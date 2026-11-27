@@ -46,6 +46,25 @@ npm run dev
 
 Open **http://localhost:3000** in Chrome, pick a Sokin case packet, and start your 45-minute mock interview.
 
+## Generating New Case Packets (Phase 3)
+
+You can turn any role-prep Markdown file, JD, proposal, or public docs URL into a new 45-minute case packet in three ways:
+
+1. **One-Command CLI (`scripts/generate_case.py`):**
+   ```bash
+   uv run --directory backend python ../scripts/generate_case.py \
+     --source docs/2026-11-24-sokin-senior-pm-external-developer-experience.md \
+     --url https://docs.sokin.com/ \
+     --topic "White-Label Partner Onboarding & KYB SLA Parity"
+   ```
+   Validate any custom case JSON:
+   ```bash
+   uv run --directory backend python ../scripts/generate_case.py \
+     --validate-only cases/sokin-api-vs-mcp-prioritisation.json
+   ```
+2. **In the Lobby UI:** Click **+ Generate New Case** on `http://localhost:3000`, paste or upload a `.md`/`.txt` role-prep doc, optionally add public doc URLs, and click **Generate & Save Case**.
+3. **Via Antigravity Skill:** The workspace skill at `.agents/skills/generate-case-packet/SKILL.md` is auto-discovered by Antigravity so you can ask it to generate a case directly from any role-prep doc + public URLs.
+
 ## Running Backend Tests
 ```bash
 cd backend
@@ -54,5 +73,5 @@ uv run pytest
 
 ## Roadmap
 - **Phase 1 (merged):** MVP Voice PTT + 45-min Phase State Machine + Sokin Case Runner + `debrief.md` Evaluator + ElevenLabs TTS toggle.
-- **Phase 2 (this branch):** Embedded `@excalidraw/excalidraw` whiteboard in the left pane with turn-synchronized PNG + JSON diff capture, Audio-Only Mode toggle, multimodal Interviewer & Evaluator vision inspection, and Whiteboard Timeline in the Debrief view.
-- **Phase 3:** Antigravity Skill / Case Generator Bridge from any `role-prep/*.md` + public API docs.
+- **Phase 2 (merged):** Embedded `@excalidraw/excalidraw` whiteboard in the left pane with turn-synchronized PNG + JSON diff capture, Audio-Only Mode toggle, multimodal Interviewer & Evaluator vision inspection, and Whiteboard Timeline in the Debrief view.
+- **Phase 3 (this branch):** Antigravity workspace skill (`.agents/skills/generate-case-packet/SKILL.md`), one-command CLI bridge (`scripts/generate_case.py`), `POST /api/cases/generate` endpoint, and Lobby **+ Generate New Case** modal.

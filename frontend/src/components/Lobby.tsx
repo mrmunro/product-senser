@@ -2,13 +2,18 @@ import { useState } from 'react';
 import {
   Clock,
   FileText,
+  Loader2,
   Mic,
   Play,
+  Plus,
   Sparkles,
+  Upload,
   Users,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
+import { api } from '../api';
 import type { CaseSummary, HealthResponse, SessionSummary, TTSProvider } from '../types';
 
 interface LobbyProps {
@@ -24,6 +29,7 @@ interface LobbyProps {
     whiteboardEnabled: boolean,
   ) => void;
   onOpenSession: (sessionId: string) => void;
+  onCaseGenerated: (newCase: CaseSummary) => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -39,12 +45,23 @@ export function Lobby({
   starting,
   onStartSession,
   onOpenSession,
+  onCaseGenerated,
 }: LobbyProps) {
   const [selectedCaseId, setSelectedCaseId] = useState<string>(cases[0]?.id ?? '');
   const [silenceNudgeSeconds, setSilenceNudgeSeconds] = useState<number>(60);
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(true);
   const [ttsProvider, setTtsProvider] = useState<TTSProvider>('browser');
   const [whiteboardEnabled, setWhiteboardEnabled] = useState<boolean>(true);
+
+  // Case Generator Modal State
+  const [showGenerator, setShowGenerator] = useState(false);
+  const [genTopic, setGenTopic] = useState('');
+  const [genCompany, setGenCompany] = useState('');
+  const [genRole, setGenRole] = useState('');
+  const [genUrls, setGenUrls] = useState('');
+  const [genSource, setGenSource] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
 
   const elevenlabsAvailable = Boolean(health?.elevenlabs_available);
   const effectiveProvider: TTSProvider =
@@ -53,12 +70,51 @@ export function Lobby({
   const activeCaseId = selectedCaseId || cases[0]?.id || '';
   const selectedCase = cases.find((c) => c.id === activeCaseId) ?? cases[0];
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    setGenSource((prev) => (prev ? `${prev}\n\n---\n\n${text}` : text));
+  };
+
+  const handleGenerateCase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGenerating(true);
+    setGenError(null);
+    try {
+      const urlList = genUrls
+        .split('\n')
+        .map((u) => u.trim())
+        .filter(Boolean);
+      const res = await api.generateCase({
+        source_markdown: genSource,
+        urls: urlList,
+        topic: genTopic.trim() || undefined,
+        company: genCompany.trim() || undefined,
+        role: genRole.trim() || undefined,
+        duration_minutes: 45,
+      });
+      onCaseGenerated(res.case);
+      setSelectedCaseId(res.case.id);
+      setShowGenerator(false);
+      setGenTopic('');
+      setGenCompany('');
+      setGenRole('');
+      setGenUrls('');
+      setGenSource('');
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : 'Failed to generate case packet');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   return (
     <div className="lobby-shell">
       <header className="lobby-header">
         <div>
           <div className="brand-row">
-            <span className="brand-badge">Phase 2 · Voice + Excalidraw Whiteboard</span>
+            <span className="brand-badge">Phase 3 · Voice + Excalidraw + Case Generator</span>
             {health && (
               <span className={`mode-pill ${health.demo_mode ? 'demo' : 'live'}`}>
                 <Sparkles size={13} />
@@ -80,7 +136,16 @@ export function Lobby({
         <section className="lobby-main">
           <div className="section-title-row">
             <h2>1. Select Case Packet</h2>
-            <span className="muted">{cases.length} seeded Sokin cases</span>
+            <div className="section-actions">
+              <span className="muted">{cases.length} cases</span>
+              <button
+                type="button"
+                className="ghost-btn small-btn"
+                onClick={() => setShowGenerator(true)}
+              >
+                <Plus size={14} /> Generate New Case
+              </button>
+            </div>
           </div>
 
           <div className="case-grid">
@@ -308,6 +373,118 @@ export function Lobby({
           )}
         </aside>
       </main>
+
+      {showGenerator && (
+        <div className="modal-backdrop" onClick={() => !generating && setShowGenerator(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>Generate Custom Case Packet</h2>
+                <p className="muted">
+                  Turn any role-prep Markdown, JD, or public API docs URL into a 45-minute case with hidden facts and curveballs.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => !generating && setShowGenerator(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form className="modal-form" onSubmit={(e) => void handleGenerateCase(e)}>
+              <div className="form-row-2">
+                <div className="control-group">
+                  <label htmlFor="gen-company">Company (optional)</label>
+                  <input
+                    id="gen-company"
+                    type="text"
+                    placeholder="e.g. Sokin, Stripe, Monzo"
+                    value={genCompany}
+                    onChange={(e) => setGenCompany(e.target.value)}
+                  />
+                </div>
+                <div className="control-group">
+                  <label htmlFor="gen-role">Target Role (optional)</label>
+                  <input
+                    id="gen-role"
+                    type="text"
+                    placeholder="e.g. Senior PM — Platform & DX"
+                    value={genRole}
+                    onChange={(e) => setGenRole(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="control-group">
+                <label htmlFor="gen-topic">Case Focus / Dilemma (optional)</label>
+                <input
+                  id="gen-topic"
+                  type="text"
+                  placeholder="e.g. White-Label Partner Onboarding & KYB SLA Parity"
+                  value={genTopic}
+                  onChange={(e) => setGenTopic(e.target.value)}
+                />
+              </div>
+
+              <div className="control-group">
+                <label htmlFor="gen-urls">Public Docs URLs (optional, one per line)</label>
+                <textarea
+                  id="gen-urls"
+                  rows={2}
+                  placeholder="https://docs.sokin.com/"
+                  value={genUrls}
+                  onChange={(e) => setGenUrls(e.target.value)}
+                />
+              </div>
+
+              <div className="control-group">
+                <div className="label-row">
+                  <label htmlFor="gen-source">Role Prep / JD / Proposal Markdown</label>
+                  <label className="upload-pill">
+                    <Upload size={12} /> Load .md / .txt file
+                    <input
+                      type="file"
+                      accept=".md,.txt,.markdown"
+                      hidden
+                      onChange={(e) => void handleFileUpload(e)}
+                    />
+                  </label>
+                </div>
+                <textarea
+                  id="gen-source"
+                  rows={7}
+                  placeholder="Paste your role-prep doc, job description, or proposal notes here..."
+                  value={genSource}
+                  onChange={(e) => setGenSource(e.target.value)}
+                />
+              </div>
+
+              {genError && <div className="error-banner">{genError}</div>}
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  disabled={generating}
+                  onClick={() => setShowGenerator(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="primary-btn"
+                  disabled={generating || (!genSource.trim() && !genUrls.trim())}
+                >
+                  {generating ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
+                  <span>{generating ? 'Generating Case Packet…' : 'Generate & Save Case'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
